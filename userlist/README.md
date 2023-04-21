@@ -48,3 +48,148 @@ function App() {
   return <CreateUser username={username} email={email} />;
 }
 ```
+
+## 📗 input 컴포넌트에서 onChange가 발생할 때마다 전체가 다시 리렌더링되는 이유, useMemo()로 계산값 저장하기
+
+```js
+function countActiveUsers(users) {
+  console.log('active 유저 수를 세는 중...');
+  return users.filter((user) => user.active).length;
+}
+
+function App() {
+  const [inputs, setInputs] = useState({
+    username: '',
+    email: '',
+  });
+  const { username, email } = inputs;
+
+  const [users, setUsers] = useState([
+    {
+      id: 1,
+      username: 'velopert',
+      email: 'public.velopert@gmail.com',
+      active: true,
+    },
+    // ...
+  ]);
+
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setInputs({
+      ...inputs,
+      [name]: value,
+    });
+  };
+
+  // ...
+
+  const userCount = countActiveUsers(users);
+
+  // 다음과 같이 useMemo로 감싸면 countActiveUsers()의 실행 결과값을 저장하고, 값이 바뀌지 않는다면 이전에 연산한 결과를 재사용한다.
+  // const userCount = useMemo(() => countActiveUsers(users), [users]);
+
+  return (
+    <>
+      {/* CreateUser안에는 username, email 두 개의 input이 있다 */}
+      <CreateUser
+        username={username}
+        email={email}
+        onChange={onChange}
+        onCreate={onCreate}
+      />
+      <UserList users={users} onToggle={onToggle} onRemove={onRemove} />
+      <div>{userCount} 명</div>
+    </>
+  );
+}
+```
+
+이처럼 상위 컴포넌트에 state가 위치하고 하위 컴포넌트에 있는 input이 상위의 state와 동기화되어 있는 경우, input에 onChange가 발생할 때마다 상위 컴포넌트도 리렌더링된다.
+
+그래서 컴포넌트 내부에 작성한 변수, 함수는 새로 생성되는데 위의 예시처럼 어떤 함수를 실행한 결과값을 useMemo()에 저장해 최적화할 수 있고, 함수 자체는 useCallback()를 통해 기억할 수 있다.
+
+- +) useCallback()은 사실 useMemo()를 함수 기억용으로 발전시킨 것이다. useCallback은 `useMemo(() => () => {})`와 같다.
+- `useMemo(() => 기억할 값)`의 기억할 값이 `() => {}` (함수)가 된 것 뿐이다.
+
+## 📗 React.memo로 리렌더링 방지
+
+### React.memo()의 효과
+
+React.memo()로 컴포넌트를 감싸면, props가 변경되지 않는 한 모이징 된 결과를 재사용한다. 가상 DOM에서 달라진 부분을 비교하지 않아 성능이 향상된다.
+
+### 언제 React.memo()를 사용해야 할까?
+
+상위 컴포넌트가 자주 렌더링되지만 그 아래에 속한 어떤 컴포넌트에는 props에 변화가 자주 없는 경우 그 하위 컴포넌트에 React.memo()를 사용하면 좋다.
+
+예를 들어 화면에 글자를 띄우는 `<Text/>` 컴포넌트와 서버시간을 실시간으로 보여주는 컴포넌트인 `<RealtimeClock/>`을 포함하는 `<ServerTimeViewer/>`가 있다고 하자.
+
+```js
+function ServerTimeViewer({ text, time }) {
+  return (
+    <>
+      <Text text={text} />
+      <RealtimeClock time={time} />
+    </>
+  );
+}
+```
+
+실시간으로 서버에서 `time`을 받아오기 때문에 `ServerTimeViewer` 전체가 계속 리렌더링될 것이다. 하지만 `Text` 컴포넌트는 props로 고작 "Hello"라는 문자열만 받아 띄우고 있는 상황이라면 같이 리렌더링될 필요가 없다. 이때 `Text` 컴포넌트를 `React.memo()`로 감싸면 된다.
+
+참조: https://ui.toast.com/weekly-pick/ko_20190731
+
+### 이럴 때는 React.memo()를 사용하지 않는 것이 좋다
+
+- 클래스 컴포넌트를 React.memo()로 래핑하는 것은 추천 X - shouldComponentUpdate를 확장
+- props가 자주 변하는 컴포넌트 - 계속 props 비교가 일어나기 때문에 성능 저하
+
+## 📗 state 함수형 업데이트 - array형 state 최적화에 좋음
+
+state로 관리되고 있는 배열 중 한 요소에 변화가 생기면 목록 전체가 리렌더링되는 현상이 발생한다.
+
+예를 들어 아래처럼 `User`를 요소로 갖는 `UserList` 컴포넌트가 있다고 하자.
+
+```js
+function UserList({ users, onRemove, onToggle }) {
+  return (
+    <div>
+      {users.map((user) => (
+        <User
+          key={user.id}
+          user={user}
+          onToggle={onToggle}
+          onRemove={onRemove}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+만약 User를 클릭해 active 상태를 toggle한다면 UserList 전체와 User 컴포넌트들이 다시 렌더링된다. 왜냐하면 `users` state가 새로운 배열로 대체되었기 때문이다.
+
+```js
+const onToggle = useCallback(
+  (id) => {
+    setUsers(
+      users.map((user) =>
+        user.id === id ? { ...user, active: !user.active } : user
+      )
+    );
+  },
+  [users]
+);
+```
+
+그럴 때는 이전 state를 반영해 업데이트 하는 함수형 업데이트 방식을 사용하면 된다. 그리고 onToggle외에도 onRemove 함수처럼 deps로 users를 갖는 함수들도 함수형 업데이트 방식으로 바꾸면 새로 생성되지 않는다.
+
+```js
+const onToggle = useCallback((id) => {
+  setUsers((users) =>
+    users.map((user) =>
+      user.id === id ? { ...user, active: !user.active } : user
+    )
+  );
+}, []);
+```
