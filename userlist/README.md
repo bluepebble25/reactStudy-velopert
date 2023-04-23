@@ -193,3 +193,97 @@ const onToggle = useCallback((id) => {
   );
 }, []);
 ```
+
+## 📗 useReducer() 이란?
+
+React에서도 `useReducer()` hook을 이용해 redux와 같이 컴포넌트와 로직을 분리할 수 있다.
+
+`useReducer()`는 `[state, dispatch]`를 반환한다.  
+dispatch는 [state, setState]에서 setState에 해당한다. 하지만 직접 state를 변경하는 게 아니라 reducer에게 상태가공을 의뢰하는 trigger 같은 역할을 한다.
+
+```js
+const [state, dispatch] = useReducer(reducer, initialState);
+```
+
+### reducer 함수
+
+state와 action을 인수로 받는다. 들어온 action에 따라 state를 변경한다.
+
+```js
+function reducer(state, action) {
+  // ...
+}
+```
+
+### reducer로 상태 로직 분리한 예시
+
+```js
+const initialState = {
+  input: {
+    username: '',
+    email: '',
+  },
+  users: [
+    {
+      id: 1,
+      username: 'John',
+      email: 'abc123@gmail.com',
+    },
+    //...
+  ],
+};
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'CREATE_USER':
+      return { ...state, users: state.users.concat(action.user) };
+    // ...
+    default:
+      return state;
+  }
+}
+
+function App() {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  const onCreate = () => {
+    const user = {
+      id: 4,
+      username: 'Emily',
+      email: 'emily@gmail.com',
+    };
+
+    dispatch({
+      type: 'CREATE_USER',
+      user,
+    });
+  };
+
+  // ...
+  return (
+    <button onClick={onCreate}>Add new user<button/>
+  )
+}
+```
+
+### js 프로퍼티명 생략
+
+object에 변수를 할당하는 경우, 프로퍼티명을 생략할 수 있다.
+
+```js
+const a = 1;
+const b = 2;
+
+const obj = {
+  a,
+  b,
+};
+
+/*
+  const obj = {
+    a: a
+    b: b
+  }
+  와 같음
+*/
+```
