@@ -11,11 +11,11 @@ function useInputs(initialForm) {
     }));
   }, []);
 
-  const reset = useCallback(() => {
+  const onReset = useCallback(() => {
     setForm(initialForm);
   }, [initialForm]);
 
-  return [form, onChange, reset];
+  return [form, onChange, onReset];
 }
 
 export default useInputs;
