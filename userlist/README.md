@@ -287,3 +287,80 @@ const obj = {
   와 같음
 */
 ```
+
+## 📗 useInputs hook 만들기 - form 관리하기
+
+### 계획
+
+form 관리 전용 hook을 만들 것이다. 그러면 매번 state와 onChange 등의 로직을 일일이 입력할 필요 없이 hook을 호출해서 간편하게 입력 form 값을 관리할 수 있다.
+
+form 관리 hook은 어때야하는지 생각해보자.
+
+1. form 값을 저장할 state를 갖고 있어야 한다.
+2. 바깥에서 onChange 로직을 작성할 필요가 없도록 내부에 로직을 갖고있어야 한다. 바깥의 input에 부착할 onChange 함수를 반환하자.
+3. 초기값으로 reset할 수 있도록 reset 함수도 반환하자.
+
+### 코드
+
+```js
+import { useState } from 'react';
+
+function useInputs(initialForm) {
+  const [form, setForm] = useState(initialForm);
+
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setForm((form) => ({
+      ...form,
+      [name]: value,
+    }));
+  };
+
+  const reset = () => {
+    setForm(initialForm);
+  };
+
+  return [form, onChange, reset];
+}
+
+export default useInputs;
+```
+
+### 개선하기
+
+리렌더링될 때마다 함수가 새로 생성되지 않기 위해 함수를 `useCallback()`으로 감싸준다.
+
+```js
+import { useState, useCallback } from 'react';
+
+function useInputs(initialForm) {
+  const [form, setForm] = useState(initialForm);
+
+  const onChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setForm((form) => ({
+      ...form,
+      [name]: value,
+    }));
+  }, []);
+
+  const reset = useCallback(() => {
+    setForm(initialForm);
+  }, [initialForm]);
+
+  return [form, onChange, reset];
+}
+
+export default useInputs;
+```
+
+### 사용하기
+
+`const [state, onChange, reset]` 순으로 사용하면 된다. 아래는 구조분해할당으로 state를 `{username, email}`로 나눠 받은 모습이다.
+
+```js
+const [{ username, email }, onChange, reset] = useInputs({
+  username: '',
+  email: '',
+});
+```
