@@ -1,5 +1,10 @@
 import { useState, useCallback } from 'react';
 
+/**
+ *
+ * @param {any} initialForm form 초기값
+ * @returns input state, onChange 함수, onReset 함수
+ */
 function useInputs(initialForm) {
   const [form, setForm] = useState(initialForm);
 

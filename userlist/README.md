@@ -364,3 +364,56 @@ const [{ username, email }, onChange, reset] = useInputs({
   email: '',
 });
 ```
+
+## 📗 useInputs, dispatch, Context API로 입력폼 자체에서 값 관리하기
+
+입력폼 자체에서 상태값을 관리하면 상위 컴포넌트의 복잡도가 많이 줄어들 것이다. 우리가 그동안 그렇게 하지 못한 이유는 다른 곳에서 그 상태값을 사용하거나 변경할 일이 있어서인데, 입력폼 내부에서 상위로 값을 보낼 방법이 있다면 그 고민이 해결될 것이다.
+
+1. 일단 입력폼 내부에서 상태를 관리하도록 한다. 만들어 놓은 `useInputs`을 사용하면 간편하다.
+2. 입력폼이 있는 컴포넌트를 `Provider`로 감싸고 value로 `dispatch`를 내려준다. 입력폼 컴포넌트 내부에서는 `useContext`를 이용해 `dispatch`를 불러온다.
+3. `dispatch`로 상위에 있는 state에 값을 보낸다.
+
+```js
+function CreateUser() {
+  const [{ username, email }, onChange, onReset] = useInputs({
+    username: '',
+    email: '',
+  });
+
+  const dispatch = useContext(UserDispatch);
+  const nextId = useRef(4);
+
+  const onCreate = useCallback(() => {
+    const user = {
+      id: nextId.current,
+      username,
+      email,
+      active: true,
+    };
+
+    dispatch({ type: 'CREATE_USER', user });
+    onReset();
+    nextId.current += 1;
+  }, [username, email, dispatch, onReset]);
+
+  return (
+    <div>
+      <input
+        name="username"
+        placeholder="계정명"
+        onChange={onChange}
+        value={username}
+      />
+      <input
+        name="email"
+        placeholder="이메일"
+        onChange={onChange}
+        value={email}
+      />
+      <button type="button" onClick={onCreate}>
+        등록
+      </button>
+    </div>
+  );
+}
+```
