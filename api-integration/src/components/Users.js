@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import axios from 'axios';
 import useAsync from '../hooks/useAsync';
+import User from './User';
 
 async function getUsers() {
   const res = await axios.get('https://jsonplaceholder.typicode.com/users');
@@ -7,6 +9,7 @@ async function getUsers() {
 }
 
 function Users() {
+  const [userId, setUserId] = useState(null);
   const [state, refetch] = useAsync(getUsers, [], true);
   const { data: users, loading, error } = state;
 
@@ -17,12 +20,13 @@ function Users() {
     <>
       <ul>
         {users.map((user) => (
-          <li key={user.name}>
+          <li key={user.name} onClick={() => setUserId(user.id)}>
             {user.name} ({user.username})
           </li>
         ))}
       </ul>
       <button onClick={refetch}>다시 불러오기</button>
+      {userId && <User id={userId} />}
     </>
   );
 }

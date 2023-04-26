@@ -256,3 +256,79 @@ function App() {
   );
 }
 ```
+
+## 📗 API에 파라미터가 필요한 경우 - 클릭한 유저 정보 화면 아래에 불러오기
+
+id에 해당하는 리소스를 요청하는 `getUser(id)` 함수를 작성하고 useAsync에 callback으로 주면 된다.
+
+유저를 클릭하면 id에 해당하는 유저 정보를 불러오는 것은 userId를 state로 선언하고 dependencies 배열에 넣어 관리한다. 값이 바뀔때마다 trigger되어 정보를 가져온다.
+
+```js
+// User 컴포넌트
+async function getUser(id) {
+  const res = await axios.get(
+    `https://jsonplaceholder.typicode.com/users/${id}`
+  );
+  return res.data;
+}
+
+function User({ id }) {
+  const [state] = useAsync(() => getUser(id), [id]);
+  const { loading, data: user, error } = state;
+
+  if (loading) return <div>로딩중..</div>;
+  if (error) return <div>에러가 발생했습니다</div>;
+  if (!user) return null;
+
+  return (
+    <div>
+      <h2>{user.username}</h2>
+      <p>
+        <b>Email:</b> {user.email}
+      </p>
+    </div>
+  );
+}
+```
+
+```js
+// Users 컴포넌트
+function Users() {
+  const [userId, setUserId] = useState(null);
+  const [state, refetch] = useAsync(getUsers, [], true);
+
+  // ...
+  return (
+    <>
+      <ul>
+        {users.map((user) => (
+          <li key={user.name} onClick={() => setUserId(user.id)}>
+            {user.name} ({user.username})
+          </li>
+        ))}
+      </ul>
+      <button onClick={refetch}>다시 불러오기</button>
+      {userId && <User id={userId} />}
+    </>
+  );
+}
+```
+
+단, 주의할 점이 있는데 파라미터가 있는 callback 함수를 전달할 때 이렇게 하지 않도록 주의한다.
+
+```js
+function User({ id }) {
+  const [state] = useAsync(getUser(id), [id]);
+  // ...
+}
+```
+
+이렇게 하면 `getUser(id)`를 실행한 결과인 data가 파라미터로 전달되기 때문에 useAsync 내부의 fetchData()에서 callback()을 실행할 수 없게 되버린다.  
+우리가 onClick에 파라미터가 있는 함수를 전달할 때는 `onClick={() => someFunction(id)}`처럼 하는 것과 마찬가지로, 파라미터가 있는 callback 함수를 전달할 때에는 아래처럼 화살표 함수로 한번 감싸서 전달하자.
+
+```js
+function User({ id }) {
+  const [state] = useAsync(() => getUser(id), [id]);
+  // ...
+}
+```
