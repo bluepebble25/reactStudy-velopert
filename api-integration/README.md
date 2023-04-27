@@ -197,9 +197,9 @@ function useAsync(callback) {
 export default useAsync;
 ```
 
-그런데 특정 데이터가 바뀔 때마다 데이터가 다시 fetch될 수 있도록 useEffect()의 deps에 인자를 주는 경우가 있다. (예를 들어 10초마다 데이터가 refresh되도록 deps에 time 변수를 넣는 경우)
+그런데 특정 데이터가 바뀔 때마다 데이터가 다시 fetch될 수 있도록 useEffect()의 deps에 인자를 주는 경우가 있다. (예를 들어 10초마다 데이터가 refresh되도록 deps에 time 관련 변수를 넣는 경우)
 
-그런 상황을 고려한다면 다음과 같이 `useAsync()`의 인자로 `useEffect`의 `deps`에 넣을 의존성 배열을 전달할 수 있게 고친다면 더 훌륭할 것이다.
+그런 상황을 고려한다면 다음과 같이 `useAsync()`의 인자로 `useEffect`의 `deps`(의존성 배열)을 전달할 수 있게 고친다면 더 훌륭할 것이다.
 
 ```js
 function useAsync(callback, deps = []) {
@@ -218,7 +218,7 @@ function useAsync(callback, deps = []) {
 
 `useAsync()`를 보면 마운트 직후에 useEffect()에서 자동으로 data를 fetch해온다. 하지만 데이터 호출이 꼭 자동으로 바로 이루어질 필요는 없다. POST나 PUT, DELETE처럼 사용자가 원하는 시점에 async 요청을 해야 하는 경우도 있기 때문이다.
 
-그러므로 useEffect() 내부에서 데이터 통신 부분을 건너뛸 수 있도록 if문을 통해 조절하게 만들면 된다.
+그러므로 useEffect() 내부에서 if문을 통해 데이터 통신 부분을 건너뛸 수 있도록 플래그를 전달하면 된다.
 
 ```js
 function useAsync(callback, deps = [], skip = false) {
@@ -232,7 +232,7 @@ function useAsync(callback, deps = [], skip = false) {
 }
 ```
 
-그러면 이처럼 초기에 data가 fetch될 지를 true/false 옵션을 줘서 조절할 수 있다. 초기에 callback이 호출되는 것을 막고 직접적으로 refetch 함수를 호출할 때 요청이 이루어진다.
+그러면 이처럼 초기에 callback이 호출되는 것을 막고 직접적으로 refetch 함수를 호출할 때 요청이 이루어진다.
 
 ```js
 function App() {
@@ -259,9 +259,36 @@ function App() {
 
 ## 📗 API에 파라미터가 필요한 경우 - 클릭한 유저 정보 화면 아래에 불러오기
 
-id에 해당하는 리소스를 요청하는 `getUser(id)` 함수를 작성하고 useAsync에 callback으로 주면 된다.
+전 예제와 별 다른 건 없다. 데이터 요청 함수에 파라미터만 추가된 것 뿐이다. `getUser(id)` 함수를 작성하고 useAsync에 callback으로 주면 된다.
 
-유저를 클릭하면 id에 해당하는 유저 정보를 불러오는 것은 userId를 state로 선언하고 dependencies 배열에 넣어 관리한다. 값이 바뀔때마다 trigger되어 정보를 가져온다.
+다만 주의할 점이 있다. 파라미터가 있는 callback 함수를 전달할 때 이렇게 하지 않도록 주의한다.
+
+```js
+function User({ id }) {
+  const [state] = useAsync(getUser(id), [id]);
+  // ...
+}
+```
+
+이렇게 하면 `getUser(id)`를 실행한 결과인 data가 파라미터로 전달되기 때문에 useAsync 내부의 fetchData()에서 callback()을 실행할 수 없게 되버린다. 파라미터가 있는 callback 함수를 전달할 때에는 아래처럼 화살표 함수로 한번 감싸서 전달하자.
+
+```js
+// 파라미터가 있는 경우
+function User({ id }) {
+  const [state] = useAsync(() => getUser(id), [id]);
+  // ...
+}
+
+// 파라미터가 없으면 이렇게
+function Users() {
+  const [state] = useAsync(getUsers, [id]);
+  // ...
+}
+```
+
+아래는 파라미터 있는 함수로 데이터 요청을 하는 예제이다. 유저를 클릭하면 id에 해당하는 유저 정보를 불러온다.
+
+userId를 state로 선언하고 dependencies 배열에 넣어 관리하면 id 값이 바뀔때마다 trigger되어 정보를 가져온다.
 
 ```js
 // User 컴포넌트
@@ -314,21 +341,161 @@ function Users() {
 }
 ```
 
-단, 주의할 점이 있는데 파라미터가 있는 callback 함수를 전달할 때 이렇게 하지 않도록 주의한다.
+## 📗 Context와 API 연동 하는법
+
+Provider에서 state, dispatch, API 요청 함수를 갖고 있으면 전역적으로 데이터를 변경 및 공유할 수 있다.
+
+state를 내려주는 Provider와 dispatch를 내려주는 Provider를 감싸는 wrapper인 `UsersProvider`를 만들어준다.
 
 ```js
-function User({ id }) {
-  const [state] = useAsync(getUser(id), [id]);
-  // ...
+// UsersProvider.js
+/* Context */
+const UsersStateContext = createContext(null);
+const UsersDispatchContext = createContext(null);
+
+/* Provider */
+export function UsersProvider({ children }) {
+  const [state, dispatch] = useReducer(usersReducer, initialState);
+
+  return (
+    <UsersStateContext.Provider value={state}>
+      <UsersDispatchContext.Provider value={dispatch}>
+        {children}
+      </UsersDispatchContext.Provider>
+    </UsersStateContext.Provider>
+  );
 }
 ```
 
-이렇게 하면 `getUser(id)`를 실행한 결과인 data가 파라미터로 전달되기 때문에 useAsync 내부의 fetchData()에서 callback()을 실행할 수 없게 되버린다.  
-우리가 onClick에 파라미터가 있는 함수를 전달할 때는 `onClick={() => someFunction(id)}`처럼 하는 것과 마찬가지로, 파라미터가 있는 callback 함수를 전달할 때에는 아래처럼 화살표 함수로 한번 감싸서 전달하자.
+이렇게 필요한 부분에 감싸준다.
 
 ```js
-function User({ id }) {
-  const [state] = useAsync(() => getUser(id), [id]);
+function App() {
+  return (
+    <UsersProvider>
+      <Users />
+    </UsersProvider>
+  );
+}
+```
+
+`UsersProvider`를 마저 작성해보자. 아래와 같이 `loading, error, success 및 data`를 관리하는 `reducer`를 생성하고, `getUsers`처럼 API 호출 및 dispatch 하는 함수를 작성한다. 그러면 하위 컴포넌트에서 useContext를 하는 hook을 이용해 state에 접근할 수 있고, API 호출 함수(getUsers)를 호출하면 dispatch니 요청이니 하는 자세한 사항을 알 필요가 없다.
+
+```js
+// UsersProvider.js
+/* action */
+const GET_USERS = 'GET_USERS';
+const GET_USERS_SUCCESS = 'GET_USERS_SUCCESS';
+const GET_USERS_ERROR = 'GET_USERS_ERROR';
+const GET_USER = 'GET_USER';
+const GET_USER_SUCCESS = 'GET_USER_SUCCESS';
+const GET_USER_ERROR = 'GET_USER_ERROR';
+
+/* state objects */
+const initialState = {
+  users: {
+    loading: false,
+    data: null,
+    error: null,
+  },
+  user: {
+    loading: false,
+    data: null,
+    error: null,
+  },
+};
+
+const loadingState = {
+  loading: true,
+  data: null,
+  error: null,
+};
+
+const success = (data) => {
+  return {
+    loading: false,
+    data,
+    error: null,
+  };
+};
+
+const error = (error) => {
+  return {
+    loading: false,
+    data: null,
+    error,
+  };
+};
+
+/* reducer */
+const usersReducer = (state, action) => {
+  switch (action.type) {
+    case GET_USERS:
+      return {
+        ...state,
+        users: loadingState,
+      };
+    case GET_USERS_SUCCESS:
+      return {
+        ...state,
+        users: success(action.data),
+      };
+    case GET_USERS_ERROR:
+      return {
+        ...state,
+        user: error(action.error),
+      };
+    case GET_USER:
+      return {
+        ...state,
+        user: loadingState,
+      };
+    // ...
+  }
+};
+
+/* Context */
+const UsersStateContext = createContext(null);
+const UsersDispatchContext = createContext(null);
+
+/* Provider */
+export function UsersProvider({ children }) {
+  const [state, dispatch] = useReducer(usersReducer, initialState);
+
+  return (
+    <UsersStateContext.Provider value={state}>
+      <UsersDispatchContext.Provider value={dispatch}>
+        {children}
+      </UsersDispatchContext.Provider>
+    </UsersStateContext.Provider>
+  );
+}
+
+/* useContext hooks */
+export function useUsersState() {
+  const state = useContext(UsersStateContext);
+  if (!state) {
+    throw new Error('Cannot find UsersProvider');
+  }
+  return state;
+}
+
+export function useUsersDispatch() {
+  // ...
+}
+
+/* data fetch function */
+export async function getUsers(dispatch) {
+  dispatch({ type: GET_USERS });
+  try {
+    const res = await axios.get('https://jsonplaceholder.typicode.com/users');
+    dispatch({ type: GET_USERS_SUCCESS, data: res.data });
+  } catch (e) {
+    dispatch({ type: GET_USERS_ERROR, error: e });
+  }
+}
+
+export async function getUser(dispatch, id) {
   // ...
 }
 ```
