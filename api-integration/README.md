@@ -499,3 +499,205 @@ export async function getUser(dispatch, id) {
   // ...
 }
 ```
+
+## 📗 리팩토링
+
+### 1. api 요청과 dispatch 하는 부분 분리하기
+
+아래의 두 함수를 보면 데이터 요청과 dispatch 하는 부분이 반복되고 있다. 이 외에도 비동기 데이터 요청을 하면 이와 똑같은 함수를 작성해야 할 것이다.
+
+```js
+// UsersContext.js 의 일부
+export async function getUsers(dispatch) {
+  dispatch({ type: GET_USERS });
+  try {
+    const res = await axios.get('https://jsonplaceholder.typicode.com/users');
+    dispatch({ type: GET_USERS_SUCCESS, data: res.data });
+  } catch (e) {
+    dispatch({ type: GET_USERS_ERROR, error: e });
+  }
+}
+
+export async function getUser(dispatch, id) {
+  dispatch({ type: GET_USER });
+  try {
+    const res = await axios.get(
+      `https://jsonplaceholder.typicode.com/users/${id}`
+    );
+    dispatch({ type: GET_USER_SUCCESS, data: res.data });
+  } catch (e) {
+    dispatch({ type: GET_USER_ERROR, error: e });
+  }
+}
+```
+
+이걸 분석해서 일반화한 함수를 만들어보자.
+
+```js
+function 특정 데이터 요청 함수 {
+  try {
+    dispatch - loading
+    비동기로 특정 데이터를 요청하는 함수()
+    dispatch - success
+  } catch(e) {
+    dispatch - error
+  }
+}
+```
+
+이런 구조로 이루어져 있음을 알 수 있다.
+
+그러므로 *파라미터로 데이터 요청 함수를 받아서 dispatch 하는 로직과 결합하는 함수*를 생성해 return하면 될 것이다. <u>왜 함수를 만들어 return 하냐면 둘의 결합을 바로 실행하지 않고 정의해놓고 싶을 수 있기 때문이다.</u> 내 생각에는 이게 일종의 팩토리 패턴인 것 같다.
+
+- 데이터 fetch 부분을 분리해 정의한 파일
+
+  ```js
+  // UsersApi.js
+  export async function getUsers() {
+    const res = await axios.get('https://jsonplaceholder.typicode.com/users');
+    return res.data;
+  }
+
+  export async function getUser(id) {
+    const res = await axios.get(
+      `https://jsonplaceholder.typicode.com/users/${id}`
+    );
+    return res.data;
+  }
+  ```
+
+- `createAsyncDispatcher` 함수 - 데이터의 type과 loading 상태를 결합해 동적으로 action을 만든다. 그리고 fetch 함수와 dispatch 로직을 결합한 handler를 생성해 반환한다. 이름이 `create`로 시작하는 것은 `AsyncDispatcher` 함수를 생성해 반환한다는 뜻이다.
+
+  ```js
+  // asyncActionUtils.js
+  import { ActionType } from '../contexts/UsersContext';
+
+  export default function createAsyncDispatcher(type, promiseFn) {
+    const SUCCESS = ActionType[`${type}_SUCCESS`];
+    const ERROR = ActionType[`${type}_ERROR`];
+
+    async function actionHandler(dispatch, ...rest) {
+      dispatch({ type });
+      try {
+        const data = await promiseFn(...rest);
+        dispatch({ type: SUCCESS, data });
+      } catch (e) {
+        dispatch({ type: ERROR, error: e });
+      }
+    }
+
+    return actionHandler;
+  }
+  ```
+
+- 동적으로 action type을 할당하기 위해 UsersContext에서 object 형식으로 action.type을 정의해주었음. (Object안에 정의한 값은 `Object[ba+'nana']` -> `Object[banana]`처럼 key를 동적으로 할당해 찾을 수 있다.)
+
+  ```js
+  // UsersContext.js
+  // Action type 정의 부분
+  export const ActionType = {
+    GET_USERS: 'GET_USERS',
+    GET_USERS_SUCCESS: 'GET_USERS_SUCCESS',
+    GET_USERS_ERROR: 'GET_USERS_ERROR',
+    GET_USER: 'GET_USER',
+    GET_USER_SUCCESS: 'GET_USER_SUCCESS',
+    GET_USER_ERROR: 'GET_USER_ERROR',
+  };
+  Object.freeze(ActionType);
+  ```
+
+### 2. reducer에서 반환할 상태도 동적으로 생성하도록 바꿔보자.
+
+```js
+// asyncActionUtils.js 하단에 추가
+/* ----- state 객체들 ----- */
+const loadingState = {
+  loading: true,
+  data: null,
+  error: null,
+};
+
+const success = (data) => {
+  return {
+    loading: false,
+    data,
+    error: null,
+  };
+};
+
+const error = (error) => {
+  return {
+    loading: false,
+    data: null,
+    error,
+  };
+};
+
+/* ----- reducer에서 return할 state 간편 생성기 ----- */
+/* type은 액션 타입, stateKey는 state의 key - ex) createAsyncHandler(GET_USERS, users) */
+export function createAsyncHandler(type, stateKey) {
+  const SUCCESS = `${type}_SUCCESS`;
+  const ERROR = `${type}_ERROR`;
+
+  function handler(state, action) {
+    switch (action.type) {
+      case type:
+        return {
+          ...state,
+          [stateKey]: loadingState,
+        };
+      case SUCCESS:
+        return {
+          ...state,
+          [stateKey]: success(action.data),
+        };
+      case ERROR:
+        return {
+          ...state,
+          [stateKey]: error(action.error),
+        };
+      default:
+        return state;
+    }
+  }
+  return handler;
+}
+```
+
+이러면 reducer에서 반환할 state 객체를 자동으로 생성해주는 handler 함수를 생성할 수 있다.
+
+최종적으로 reducer에서는 자동으로 type에 해당하는 `LOADING, SUCCESS, ERROR` 상태 객체를 생성해 반환해주고, `getUsers` 변수에 api 요청과 dispatch를 하는 함수를 자동적으로 생성해 할당받는다.
+
+```js
+// UsersContext.js
+const usersHandler = createAsyncHandler('GET_USERS', 'users');
+const userHandler = createAsyncHandler('GET_USER', 'user');
+
+function usersReducer(state, action) {
+  switch (action.type) {
+    case 'GET_USERS':
+    case 'GET_USERS_SUCCESS':
+    case 'GET_USERS_ERROR':
+      return usersHandler(state, action);
+    case 'GET_USER':
+    case 'GET_USER_SUCCESS':
+    case 'GET_USER_ERROR':
+      return userHandler(state, action);
+    default:
+      throw new Error(`Unhanded action type: ${action.type}`);
+  }
+}
+
+/* data fetch function */
+export const getUsers = createAsyncDispatcher(
+  ActionType.GET_USERS,
+  Api.getUsers
+);
+export const getUser = createAsyncDispatcher(ActionType.GET_USER, Api.getUser);
+```
+
+### 이 리팩토링에서 배운 점
+
+공통되는 로직을 일반화 시키기 위해 구체적인 로직이 아니라 거시적인 구조를 일반화 할 수 있다는 것을 깨달았다. 그리고 util 함수를 만들 때 결과값을 반환하지 않고 함수를 생성해 반환할 수도 있다는 것을 배웠다.
+
+전에 디자인 패턴 책에서 '팩토리 패턴'에 대해 읽었을 때에는 그냥 그렇구나 하고 정확히 뭔지는 와닿지 않았는데, `create~` 같은 고차 함수를 만들면서 '이런게 팩토리 패턴이구나'와 왜 이런 패턴을 쓰는지 효용을 깨달았다.

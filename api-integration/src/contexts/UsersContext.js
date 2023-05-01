@@ -1,13 +1,19 @@
 import { createContext, useContext, useReducer } from 'react';
-import axios from 'axios';
+import createAsyncDispatcher, {
+  createAsyncHandler,
+} from '../_lib/asyncActionUtils';
+import * as Api from '../_lib/usersApi';
 
 /* action */
-const GET_USERS = 'GET_USERS';
-const GET_USERS_SUCCESS = 'GET_USERS_SUCCESS';
-const GET_USERS_ERROR = 'GET_USERS_ERROR';
-const GET_USER = 'GET_USER';
-const GET_USER_SUCCESS = 'GET_USER_SUCCESS';
-const GET_USER_ERROR = 'GET_USER_ERROR';
+export const ActionType = {
+  GET_USERS: 'GET_USERS',
+  GET_USERS_SUCCESS: 'GET_USERS_SUCCESS',
+  GET_USERS_ERROR: 'GET_USERS_ERROR',
+  GET_USER: 'GET_USER',
+  GET_USER_SUCCESS: 'GET_USER_SUCCESS',
+  GET_USER_ERROR: 'GET_USER_ERROR',
+};
+Object.freeze(ActionType);
 
 /* state objects */
 const initialState = {
@@ -23,61 +29,20 @@ const initialState = {
   },
 };
 
-const loadingState = {
-  loading: true,
-  data: null,
-  error: null,
-};
-
-const success = (data) => {
-  return {
-    loading: false,
-    data,
-    error: null,
-  };
-};
-
-const error = (error) => {
-  return {
-    loading: false,
-    data: null,
-    error,
-  };
-};
-
 /* reducer */
+const usersHandler = createAsyncHandler(ActionType.GET_USERS, 'users');
+const userHandler = createAsyncHandler(ActionType.GET_USER, 'user');
+
 const usersReducer = (state, action) => {
   switch (action.type) {
-    case GET_USERS:
-      return {
-        ...state,
-        users: loadingState,
-      };
-    case GET_USERS_SUCCESS:
-      return {
-        ...state,
-        users: success(action.data),
-      };
-    case GET_USERS_ERROR:
-      return {
-        ...state,
-        user: error(action.error),
-      };
-    case GET_USER:
-      return {
-        ...state,
-        user: loadingState,
-      };
-    case GET_USER_SUCCESS:
-      return {
-        ...state,
-        user: success(action.data),
-      };
-    case GET_USER_ERROR:
-      return {
-        ...state,
-        user: error(action.error),
-      };
+    case ActionType.GET_USERS:
+    case ActionType.GET_USERS_SUCCESS:
+    case ActionType.GET_USERS_ERROR:
+      return usersHandler(state, action);
+    case ActionType.GET_USER:
+    case ActionType.GET_USER_SUCCESS:
+    case ActionType.GET_USER_ERROR:
+      return userHandler(state, action);
     default:
       throw new Error(`Unhanded action type: ${action.type}`);
   }
@@ -118,24 +83,8 @@ export function useUsersDispatch() {
 }
 
 /* data fetch function */
-export async function getUsers(dispatch) {
-  dispatch({ type: GET_USERS });
-  try {
-    const res = await axios.get('https://jsonplaceholder.typicode.com/users');
-    dispatch({ type: GET_USERS_SUCCESS, data: res.data });
-  } catch (e) {
-    dispatch({ type: GET_USERS_ERROR, error: e });
-  }
-}
-
-export async function getUser(dispatch, id) {
-  dispatch({ type: GET_USER });
-  try {
-    const res = await axios.get(
-      `https://jsonplaceholder.typicode.com/users/${id}`
-    );
-    dispatch({ type: GET_USER_SUCCESS, data: res.data });
-  } catch (e) {
-    dispatch({ type: GET_USER_ERROR, error: e });
-  }
-}
+export const getUsers = createAsyncDispatcher(
+  ActionType.GET_USERS,
+  Api.getUsers
+);
+export const getUser = createAsyncDispatcher(ActionType.GET_USER, Api.getUser);
