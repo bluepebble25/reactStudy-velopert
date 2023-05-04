@@ -6,8 +6,7 @@ const TOGGLE_TODO = 'TOGLE_TODO';
 let nextId = 1; // todo 데이터에서 사용할 고유 id
 export const addTodo = (text) => ({
   type: ADD_TODO,
-  todo: { id: nextId++, text },
-  done: false,
+  todo: { id: nextId++, text, done: false },
 });
 export const toggleTodo = (id) => ({ type: TOGGLE_TODO, id });
 
