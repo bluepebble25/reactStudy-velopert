@@ -1,6 +1,6 @@
 /* action type 정의 */
-const ADD_TODO = 'ADD_TODO';
-const TOGGLE_TODO = 'TOGLE_TODO';
+const ADD_TODO = 'todos/ADD_TODO';
+const TOGGLE_TODO = 'todos/TOGLE_TODO';
 
 /* action creator 정의 */
 let nextId = 1; // todo 데이터에서 사용할 고유 id
