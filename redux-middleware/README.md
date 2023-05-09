@@ -1,70 +1,57 @@
-# Getting Started with Create React App
+# redux-middleware
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+만들면서 배운 점 정리
 
-## Available Scripts
+https://ridicorp.com/story/how-to-use-redux-in-ridi/
 
-In the project directory, you can run:
+## 📗 미들웨어가 필요한 이유
 
-### `npm start`
+- redux에서 action이 dispatch되고, reducer가 가공한 state를 반환해 store에 반환되는 이 과정은 동기적으로 이루어진다.
+- 그래서 만약 시간을 지연시키고 싶거나 API 통신같은 비동기 작업을 수행하고 싶을 때 중간에 미들웨어를 놓는다.
+- 미들웨어는 API 통신같은 비동기 작업, 시간 지연 외에도 로깅 등에 사용할 수 있다.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 📗 미들웨어 함수 양식
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+미들웨어 함수를 작성하는 양식은 다음과 같다.
 
-### `npm test`
+```js
+const middleware = (store) => (next) => (action) => {
+  // ... 미들웨어에서 할 작업
+};
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+화살표 함수로 계속 이어지는데 사실 아래처럼 계속 함수를 반환하는 구조이다.
 
-### `npm run build`
+```js
+function middleware(store) {
+  return function (next) {
+    return function (action) {
+      // ... 미들웨어에서 할 작업
+    };
+  };
+}
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 📗 로깅함수로 미들웨어 작성하는 법 알아보기
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+미들웨어 함수는 여러개를 이어붙여 사용하는 경우가 있다. 그러므로 다음 미들웨어 함수를 호출하고 인자를 넘겨줄 수 있어야 하는데 그 역할을 `next()` 함수가 한다.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+`next(action)`를 보면 `next()`로 다음 미들웨어 함수를 호출하면서 action를 다음 미들웨어가 사용할 수 있게 전달하고 있다.
 
-### `npm run eject`
+```js
+// myLogger.js
+const myLogger = (store) => (next) => (action) => {
+  console.log(action);
+  console.log('\t', store.getState());
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+  const result = next(action);
+  return result;
+};
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+미들웨어 적용은 `applyMiddleware()` 함수로 미들웨어 함수들을 감싸면 된다. 미들웨어가 여러개라면 `applyMiddleware()` 안에 파라미터로 다 전달하면 된다.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```js
+// index.js
+const store = createStore(rootReducer, applyMiddleware(myLogger));
+```
