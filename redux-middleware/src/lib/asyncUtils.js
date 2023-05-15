@@ -64,12 +64,12 @@ export const handleAsyncAction = (type, key) => {
       case SUCCESS:
         return {
           ...state,
-          [key]: reducerUtils.success(),
+          [key]: reducerUtils.success(action.payload),
         };
       case ERROR:
         return {
           ...state,
-          [key]: reducerUtils.error(),
+          [key]: reducerUtils.error(action.payload),
         };
       default:
         return state;
