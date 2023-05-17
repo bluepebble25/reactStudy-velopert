@@ -212,6 +212,79 @@ dispatch(function async(dispatch) {
 
 따라서 redux-thunk 미들웨어에 의해 dispatch 안의 thunk 함수가 실행되어 비동기 작업을 수행하고 나면, 최종적으로 인자로 받은 dispatch를 이용해 action을 dispatch한다. thunk가 dispatch를 대신 수행해주는 셈이다.
 
+## 📗 redux로 재로딩 문제 해결하기
+
+### 문제
+
+여태 데이터를 불러올 때 LOADING, SUCCESS, ERROR 세 가지 상태로 나누어 관리했다. 로딩 중에는 data를 잠시 null로 비웠다가 SUCCESS가 되면 새로운 값을 설정하곤 했는데, 그렇게 되면 data가 null이어서 로딩중... 이라는 표시가 뜨게 된다.
+
+### 해결방법
+
+데이터가 로딩되는 동안 이전 데이터를 잠깐 보여주고 있을 지를 keepData라는 flag로 관리한다. reducer에서 LOADING 타입에 대한 state를 반환할 때 keepData가 true라면 state['posts'].data를 반환하고, false면 null을 반환하도록 한다. 그러면 데이터가 아예 존재하지 않은 경우에는 로딩중...이 뜨지만 이미 존재하는 데이터가 있다면 LOADING action에 대한 공백이 느껴지지 않을 것이다.
+
+아래는 reducer에서 반환할 상태값을 생성해주는 util 함수의 코드이다.
+
+```js
+export const handleAsyncActions = (type, key, keepData = false) => {
+  const [SUCCESS, ERROR] = [`${type}_SUCCESS`, `${type}_ERROR`];
+  return (state, action) => {
+    switch (action.type) {
+      case type:
+        return {
+          ...state,
+          [key]: reducerUtils.loading(keepData ? state[key].data : null),
+        };
+      case SUCCESS:
+        return {
+          ...state,
+          [key]: reducerUtils.success(action.payload),
+        };
+      case ERROR:
+        return {
+          ...state,
+          [key]: reducerUtils.error(action.error),
+        };
+      default:
+        return state;
+    }
+  };
+};
+```
+
+```js
+export const reducerUtils = {
+  initial: (initialData = null) => ({
+    loading: false,
+    data: initialData,
+    error: false,
+  }),
+  loading: (prevState = null) => ({
+    loading: true,
+    data: prevState,
+    error: null,
+  }),
+  // ...
+};
+```
+
+```js
+// reducer 부분
+export default function posts(state = initialState, action) {
+  switch (action.type) {
+    case GET_POSTS:
+    case GET_POSTS_SUCCESS:
+    case GET_POSTS_ERROR:
+      return handleAsyncActions(GET_POSTS, 'posts', true)(state, action);
+    case GET_POST:
+    case GET_POST_SUCCESS:
+    case GET_POST_ERROR:
+      return handleAsyncActions(GET_POST, 'post')(state, action);
+    default:
+      return state;
+  }
+}
+```
+
 ## Reference
 
 - https://velog.io/@mokyoungg/Redux-Redux-thunk

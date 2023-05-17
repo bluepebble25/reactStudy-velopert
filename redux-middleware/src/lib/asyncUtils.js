@@ -51,7 +51,7 @@ export const reducerUtils = {
  * @param {*} type action의 type 명 - ex) GET_POSTS
  * @param {*} key action을 통해 변경할 모듈 명 - ex) posts, post
  */
-export const handleAsyncAction = (type, key) => {
+export const handleAsyncAction = (type, key, keepData = false) => {
   const [SUCCESS, ERROR] = [`${type}_SUCCESS`, `${type}_ERROR`];
 
   return (state, action) => {
@@ -59,7 +59,7 @@ export const handleAsyncAction = (type, key) => {
       case type:
         return {
           ...state,
-          [key]: reducerUtils.loading(),
+          [key]: reducerUtils.loading(keepData ? state[key].data : null),
         };
       case SUCCESS:
         return {
@@ -69,7 +69,7 @@ export const handleAsyncAction = (type, key) => {
       case ERROR:
         return {
           ...state,
-          [key]: reducerUtils.error(action.payload),
+          [key]: reducerUtils.error(action.error),
         };
       default:
         return state;
