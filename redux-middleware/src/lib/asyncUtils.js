@@ -1,7 +1,7 @@
 /**
  * thunk를 생성하는 함수.
  * @param {*} type action의 type 명
- * @param {function} promiseCreator API 호출 등 비동기 작업을 하는 함수를 실행하지 않고 전달한다.
+ * @param {function} promiseCreator API 호출 등 비동기 작업을 하는 함수
  * @returns thunk 함수
  */
 export const createPromiseThunk = (type, promiseCreator) => {

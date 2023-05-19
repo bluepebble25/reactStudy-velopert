@@ -13,9 +13,9 @@ const GET_POSTS_SUCCESS = 'GET_POSTS_SUCCESS';
 const GET_POSTS_ERROR = 'GET_POSTS_ERROR';
 
 // 포스트 한 개 조회
-const GET_POST = 'GET_POSTS';
-const GET_POST_SUCCESS = 'GET_POSTS_SUCCESS';
-const GET_POST_ERROR = 'GET_POSTS_ERROR';
+const GET_POST = 'GET_POST';
+const GET_POST_SUCCESS = 'GET_POST_SUCCESS';
+const GET_POST_ERROR = 'GET_POST_ERROR';
 
 // thunk 함수
 export const getPosts = createPromiseThunk(GET_POSTS, postsAPI.getPosts);

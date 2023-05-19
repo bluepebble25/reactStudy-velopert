@@ -28,5 +28,6 @@ export const getPosts = async () => {
 
 export const getPostById = async (id) => {
   await sleep(500);
-  return posts.filter((post) => post.id === id);
+  const post = posts.filter((post) => post.id === id);
+  return post && post[0];
 };
